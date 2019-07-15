@@ -1,14 +1,18 @@
+CFLAGS += -g --std=c89 -D_BSD_SOURCE
+LDLIBS += -lm
 
 all : nseg nmerge
 
-nseg : nseg.c lnfac.h genwin.h genwin.o
-	cc -g -o nseg nseg.c genwin.o -lm
-
-nmerge : nmerge.c genwin.h genwin.o
-	cc -g -o nmerge nmerge.c genwin.o -lm
+.PHONY: all clean
 
 genwin.o : genwin.c genwin.h
-	cc -g -c genwin.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+nseg : nseg.c lnfac.h genwin.h genwin.o
+	$(CC) $(CFLAGS) -o $@ $< genwin.o $(LDLIBS)
+
+nmerge : nmerge.c genwin.h genwin.o
+	$(CC) $(CFLAGS) -o $@ $< genwin.o $(LDLIBS)
 
 clean:
-	rm -f nseg nseg.o genwin.o
+	rm -f nseg nmerge genwin.o
