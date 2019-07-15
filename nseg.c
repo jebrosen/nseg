@@ -6,6 +6,8 @@
 
 /*--------------------------------------------------------------(includes)---*/
 
+#include <unistd.h>
+#include <string.h>
 #include "genwin.h"
 #include "lnfac.h"
 
@@ -23,6 +25,36 @@ struct Segment
    int end;
    struct Segment *next;
   };
+
+/*----------------------------------------------------------------(protos)---*/
+
+void getparams(int argc, char *argv[]);
+
+void segseq(struct Sequence *seq, struct Segment **segs, int offset);
+
+Bool hasdash(struct Sequence *win);
+int findlo(int i, int limit, double *H);
+int findhi(int i, int limit, double *H);
+void trim(struct Sequence *seq, int *leftend, int *rightend);
+
+void mergesegs(struct Sequence *seq, struct Segment *segs);
+
+void per_seqprep(struct Sequence *seq, struct Segment **persegs);
+void report(struct Sequence *seq, struct Segment *segs);
+void singreport(struct Sequence *seq, struct Segment *segs);
+void per_singreport(struct Sequence *seq);
+void prettyreport(struct Sequence *seq, struct Segment *segs);
+void per_prettyreport(struct Sequence *seq);
+
+void seqout(struct Sequence *seq, int hilo, int begin, int end);
+void appendseg(struct Segment *segs, struct Segment *seg);
+void freesegs(struct Segment *segs);
+
+void pretreereport(struct Sequence *seq, struct Segment *segs);
+void per_pretreereport(struct Sequence *seq, struct Segment *segs);
+void space(register size_t len);
+
+void usage(void);
 
 /*---------------------------------------------------------------(globals)---*/
 
@@ -50,14 +82,10 @@ struct Segment *per_mergesegs();
 
 /*------------------------------------------------------------------(main)---*/
 
-main(argc, argv)
-  int argc;
-  char *argv[];
-
+int main(int argc, char *argv[])
   {struct Database *db;
    struct Sequence *seq, *perseq;
    struct Segment *segs, **persegs;
-   int ctime;
    int i;
 
    genwininit();
@@ -100,9 +128,9 @@ main(argc, argv)
       segs = per_mergesegs(seq, persegs);
       per_seqprep(seq, persegs);
 
-      if (singleseq) per_singreport(seq, persegs, segs);
-      else if (prettyseq) per_prettyreport(seq, persegs, segs);
-      else if (prettytree) per_pretreereport(seq, persegs, segs);
+      if (singleseq) per_singreport(seq);
+      else if (prettyseq) per_prettyreport(seq);
+      else if (prettytree) per_pretreereport(seq, segs);
       else report(seq, segs);
 
       for (i=0; i<period; i++) freesegs(persegs[i]);
@@ -116,10 +144,7 @@ main(argc, argv)
 
 /*-------------------------------------------------------------(seq_phase)---*/
 
-struct Sequence *seq_phase(seq, phase, period)
-  struct Sequence *seq;
-  int phase, period;
-
+struct Sequence *seq_phase(struct Sequence *seq, int phase, int period)
   {struct Sequence *perseq;
    int len, i, j;
 
@@ -141,10 +166,7 @@ struct Sequence *seq_phase(seq, phase, period)
 
 /*-------------------------------------------------------------(getparams)---*/
 
-getparams(argc, argv)
-  int argc;
-  char *argv[];
-
+void getparams(int argc, char *argv[])
   {int i;
    int nargc;
    char **nargv;
@@ -257,11 +279,7 @@ getparams(argc, argv)
 
 /*----------------------------------------------------------------(segseq)---*/
 
-segseq(seq, segs, offset)
-  struct Sequence *seq;
-  struct Segment **segs;
-  int offset;
-
+void segseq(struct Sequence *seq, struct Segment **segs, int offset)
   {struct Segment *seg, *leftsegs;
    struct Sequence *leftseq;
    int first, last, lowlim;
@@ -320,7 +338,7 @@ segseq(seq, segs, offset)
          if (*segs==NULL) *segs = seg;
          else appendseg(*segs, seg);
 
-         i = min(hii, rightend+downset);
+         i = MIN(hii, rightend+downset);
          lowlim = i + 1;
 /*       i = hii;     this ignores the trimmed residues... */
         }
@@ -332,9 +350,7 @@ segseq(seq, segs, offset)
 
 /*----------------------------------------------------------------(seqent)---*/
 
-double *seqent(seq)
-  struct Sequence *seq;
-
+double *seqent(struct Sequence *seq)
   {struct Sequence *win;
    double *H;
    int i, first, last;
@@ -373,8 +389,7 @@ double *seqent(seq)
 
 /*---------------------------------------------------------------(hasdash)---*/
 
-hasdash(win)
-  struct Sequence *win;
+Bool hasdash(struct Sequence *win)
 {
 	register char	*seq, *seqmax;
 
@@ -390,10 +405,7 @@ hasdash(win)
 
 /*----------------------------------------------------------------(findlo)---*/
 
-findlo(i, limit, H)
-  int i, limit;
-  double *H;
-
+int findlo(int i, int limit, double *H)
   {int j;
 
    for (j=i; j>=limit; j--)
@@ -407,10 +419,7 @@ findlo(i, limit, H)
 
 /*----------------------------------------------------------------(findhi)---*/
 
-findhi(i, limit, H)
-  int i, limit;
-  double *H;
-
+int findhi(int i, int limit, double *H)
   {int j;
 
    for (j=i; j<=limit; j++)
@@ -424,12 +433,9 @@ findhi(i, limit, H)
 
 /*------------------------------------------------------------------(trim)---*/
 
-trim(seq, leftend, rightend)
-  struct Sequence *seq;
-  int *leftend, *rightend;
-
+void trim(struct Sequence *seq, int *leftend, int *rightend)
   {struct Sequence *win;
-   double prob, minprob, realprob;
+   double prob, minprob;
    int shift, len, i;
    int lend, rend;
    int minlen;
@@ -442,10 +448,10 @@ trim(seq, leftend, rightend)
    if ((seq->length-maxtrim)>minlen) minlen = seq->length-maxtrim;
 
    minprob = 1.;
-/*   fprintf(stderr, "\n");                                         /*-*/
+/*   fprintf(stderr, "\n");                                         */
    for (len=seq->length; len>minlen; len--)
      {
-/*      fprintf(stderr, "%5d ", len);                               /*-*/
+/*      fprintf(stderr, "%5d ", len);                               */
       win = openwin(seq, 0, len);
       i = 0;
 
@@ -453,8 +459,8 @@ trim(seq, leftend, rightend)
       while (shift)
         {
          prob = getprob(win->state, len);
-/*         realprob = exp(prob);                  /*-(for tracing the trim)-*/
-/*         fprintf(stderr, "%2e ", realprob);                        /*-*/
+/*         double realprob = exp(prob);                  *-(for tracing the trim)-*/
+/*         fprintf(stderr, "%2e ", realprob);                        */
          if (prob<minprob)
            {
             minprob = prob;
@@ -465,15 +471,15 @@ trim(seq, leftend, rightend)
          i++;
         }
       closewin(win);
-/*      fprintf(stderr, "\n");                                     /*-*/
+/*      fprintf(stderr, "\n");                                     */
      }
 
-/*   fprintf(stderr, "%d-%d ", *leftend, *rightend);               /*-*/
+/*   fprintf(stderr, "%d-%d ", *leftend, *rightend);               */
 
    *leftend = *leftend + lend;
    *rightend = *rightend - (seq->length - rend - 1);
 
-/*   fprintf(stderr, "%d-%d\n", *leftend, *rightend);              /*-*/
+/*   fprintf(stderr, "%d-%d\n", *leftend, *rightend);              */
 
    closewin(seq);
    return;
@@ -481,10 +487,7 @@ trim(seq, leftend, rightend)
 
 /*---------------------------------------------------------------(getprob)---*/
 
-double getprob(sv, total)
-  int *sv;
-  int total;
-
+double getprob(int *sv, int total)
   {double ans, totseq;
 
 #define LN20	2.9957322735539909
@@ -499,10 +502,7 @@ double getprob(sv, total)
 
 /*----------------------------------------------------------------(lnperm)---*/
 
-double lnperm(sv, tot)
-  int *sv;
-   int tot;
-
+double lnperm(int *sv, int tot)
   {double ans;
    int i;
 
@@ -518,8 +518,7 @@ double lnperm(sv, tot)
 
 /*-----------------------------------------------------------------(lnass)---*/
 
-double lnass(sv)
-	register int	*sv;
+double lnass(register int *sv)
 {
 	double	ans;
 	register int	svi, svim1;
@@ -561,10 +560,7 @@ double lnass(sv)
 
 /*-------------------------------------------------------------(mergesegs)---*/
 
-mergesegs(seq, segs)
-  struct Sequence *seq;
-  struct Segment *segs;
-
+void mergesegs(struct Sequence *seq, struct Segment *segs)
   {struct Segment *seg, *nextseg;
    int len;
 
@@ -614,10 +610,7 @@ mergesegs(seq, segs)
 
 /*---------------------------------------------------------(per_mergesegs)---*/
 
-struct Segment *per_mergesegs(seq, persegs)
-  struct Sequence *seq;
-  struct Segment **persegs;
-
+struct Segment *per_mergesegs(struct Sequence *seq, struct Segment **persegs)
   {struct Segment **localsegs;
    struct Segment *firstseg, *segs, *seg;
    int first;
@@ -664,16 +657,12 @@ struct Segment *per_mergesegs(seq, persegs)
 
 /*-----------------------------------------------------------(per_seqprep)---*/
 
-per_seqprep(seq, persegs)
-  struct Sequence *seq;
-  struct Segment **persegs;
-
-  {char *proseq, *proseqmax;
+void per_seqprep(struct Sequence *seq, struct Segment **persegs)
+  {char *proseq;
    struct Segment *segs, *seg;
    int begin, end, i, phase, pos;
 
    proseq = seq->seq;
-   proseqmax = proseq +seq->length;
    upper(proseq, seq->length);
 
    for (phase=0; phase<period; phase++)
@@ -720,10 +709,7 @@ per_seqprep(seq, persegs)
 
 /*----------------------------------------------------------------(report)---*/
 
-report(seq, segs)
-  struct Sequence *seq;
-  struct Segment *segs;
-
+void report(struct Sequence *seq, struct Segment *segs)
   {struct Sequence *subseq;
    struct Segment *seg, *nextseg;
    static int hi = 1;
@@ -793,9 +779,7 @@ report(seq, segs)
 
 /*------------------------------------------------------------(singreport)---*/
 
-singreport(seq, segs)
-	struct Sequence	*seq;
-	struct Segment	*segs;
+void singreport(struct Sequence *seq, struct Segment *segs)
 {
 	char	*proseq, *proseqmax;
 	struct Segment	*seg;
@@ -830,11 +814,7 @@ singreport(seq, segs)
 
 /*--------------------------------------------------------(per_singreport)---*/
 
-per_singreport(seq, persegs, psegs)
-  struct Sequence *seq;
-  struct Segment **persegs;
-  struct Segment *psegs;
-
+void per_singreport(struct Sequence *seq)
   {
    char *proseq, *proseqmax;
    int i, ctr;
@@ -863,10 +843,7 @@ per_singreport(seq, persegs, psegs)
 
 /*----------------------------------------------------------(prettyreport)---*/
 
-prettyreport(seq, segs)
-  struct Sequence *seq;
-  struct Segment *segs;
-
+void prettyreport(struct Sequence *seq, struct Segment *segs)
 {
 	char	*proseq, *proseqmax;
 	char	format[10];
@@ -918,11 +895,7 @@ prettyreport(seq, segs)
 
 /*------------------------------------------------------(per_prettyreport)---*/
 
-per_prettyreport(seq, persegs, psegs)
-  struct Sequence *seq;
-  struct Segment **persegs;
-  struct Segment *psegs;
-
+void per_prettyreport(struct Sequence *seq)
   {
    char *proseq, *proseqmax;
    int i, ctr;
@@ -951,14 +924,11 @@ per_prettyreport(seq, persegs, psegs)
 
 /*---------------------------------------------------------(pretreereport)---*/
 
-pretreereport(seq, segs)
-  struct Sequence *seq;
-  struct Segment *segs;
-
+void pretreereport(struct Sequence *seq, struct Segment *segs)
 {
 	struct Sequence	*win;
 	struct Segment	*seg;
-	char	buffer[100], leftfmt[20], rightfmt[20];
+	char	leftfmt[20], rightfmt[20];
 	char	*curseq;
 	int	i, left, right, len;
 	int	current, nextloent;
@@ -1044,15 +1014,11 @@ pretreereport(seq, segs)
 
 /*-----------------------------------------------------(per_pretreereport)---*/
 
-per_pretreereport(seq, persegs, segs)
-  struct Sequence *seq;
-  struct Segment **persegs;
-  struct Segment *segs;
-
+void per_pretreereport(struct Sequence *seq, struct Segment *segs)
   {
 	struct Sequence	*win;
 	struct Segment	*seg;
-	char	buffer[100], leftfmt[20], rightfmt[20];
+	char	leftfmt[20], rightfmt[20];
 	char	*curseq;
 	int	i, left, right, len;
 	int	current, nextloent;
@@ -1139,8 +1105,7 @@ per_pretreereport(seq, persegs, segs)
 
 /*-----------------------------------------------------------------(space)---*/
 
-space(len)
-	register int len;
+void space(register size_t len)
 {
 	static char	spaces[] =
 		{' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',
@@ -1149,7 +1114,7 @@ space(len)
 		' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',
 		' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' '
 		};
-	register int i;
+	register size_t i;
 
 	while (len > 0) {
 		i = MIN(len, sizeof(spaces)/sizeof(spaces[0]));
@@ -1160,19 +1125,13 @@ space(len)
 
 /*----------------------------------------------------------------(seqout)---*/
 
-seqout(seq, hilo, begin, end)
-  struct Sequence *seq;
-  int hilo;
-  int begin, end;
-
 #define HDRLEN 60
-
+void seqout(struct Sequence *seq, int hilo, int begin, int end)
 {
 	char	*proseq, *proseqmax, *id, *header;
-   char outbuf[HDRLEN+1];
    static int hi = 1;
    static int lo = 0;
-   int i, ctr, iend;
+   int i, iend;
 
    if (hionly && hilo==lo) return;
    if (loonly && hilo==hi) return;
@@ -1207,18 +1166,20 @@ seqout(seq, hilo, begin, end)
       else putc('\n', stdout);
      }
    
-/*   if (hilo==lo)
-/*     {
-/*      lower(proseq, seq->length);
-/*     }
-/*   else if (hilo==hi && seq->length>=hilenmin)
-/*     {
-/*      upper(proseq, seq->length);
-/*     }
-/*   else
-/*     {
-/*      lower(proseq, seq->length);
-/*     }                                               */
+/*
+     if (hilo==lo)
+       {
+        lower(proseq, seq->length);
+       }
+     else if (hilo==hi && seq->length>=hilenmin)
+       {
+        upper(proseq, seq->length);
+       }
+     else
+       {
+        lower(proseq, seq->length);
+       }
+*/
 
    for (; proseq < proseqmax; proseq+=i) {
 		i = MIN(charline, proseqmax - proseq);
@@ -1234,9 +1195,7 @@ seqout(seq, hilo, begin, end)
 
 /*-------------------------------------------------------------(appendseg)---*/
 
-appendseg(segs, seg)
-  struct Segment *segs, *seg;
-
+void appendseg(struct Segment *segs, struct Segment *seg)
   {struct Segment *temp;
 
    temp = segs;
@@ -1258,9 +1217,7 @@ appendseg(segs, seg)
 
 /*--------------------------------------------------------------(freesegs)---*/
 
-freesegs(segs)
-  struct Segment *segs;
-
+void freesegs(struct Segment *segs)
   {struct Segment *temp;
 
    while (segs!=NULL)
@@ -1273,7 +1230,7 @@ freesegs(segs)
 
 /*-----------------------------------------------------------------(usage)---*/
 
-usage()
+void usage(void)
 
   {
    fprintf(stderr, "\

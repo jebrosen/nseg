@@ -5,6 +5,7 @@
 
 /*--------------------------------------------------------------(includes)---*/
 
+#include <string.h>
 #include "genwin.h"
 
 /*---------------------------------------------------------------(defines)---*/
@@ -14,6 +15,10 @@
 /*----------------------------------------------------------------(protos)---*/
 
 struct Sequence *readentry();
+int blastdb(char *name);
+int readhdr(struct Sequence *seq);
+void readseq(struct Sequence *seq);
+void skipline(FILE *fp);
 
 /*---------------------------------------------------------------(globals)---*/
 
@@ -53,16 +58,15 @@ struct strlist
 
 #define TESTMAX 1000
 void *tmalloc();
-int record_ptrs[TESTMAX] = {0,0,0,0};
+void *record_ptrs[TESTMAX] = {0,0,0,0};
 int rptr = 0;
 
 /*------------------------------------------------------------(genwininit)---*/
 
-genwininit()
-
+void genwininit(void)
 {
 	char	*cp, *cp0;
-	int		i;
+	size_t		i;
 	char	c;
 
 	for (i = 0; i < sizeof(aaindex)/sizeof(aaindex[0]); ++i) {
@@ -72,10 +76,10 @@ genwininit()
 		
 	for (cp = cp0 = "ACGT"; (c = *cp) != '\0'; ++cp) {
 		i = cp - cp0;
-		aaindex[c] = i;
+		aaindex[(int)c] = i;
 		aaindex[tolower(c)] = i;
 		aachar[i] = tolower(c);
-		aaflag[c] = FALSE;
+		aaflag[(int)c] = FALSE;
 		aaflag[tolower(c)] = FALSE;
 	}
 	return;
@@ -83,9 +87,7 @@ genwininit()
         
 /*-------------------------------------------------------------(opendbase)---*/
 
-extern struct Database *opendbase(name)
-  char *name;
-
+extern struct Database *opendbase(char *name)
   {struct Database *dbase;
 
    dbase = (struct Database *) malloc(sizeof(struct Database));
@@ -126,9 +128,7 @@ extern struct Database *opendbase(name)
 
 /*---------------------------------------------------------------(blastdb)---*/
 
-int blastdb(name)
-  char *name;
-
+int blastdb(char *name)
   {int i;
 
    for (i=0; i<nblastdbs; i++)
@@ -141,9 +141,7 @@ int blastdb(name)
 
 /*------------------------------------------------------------(closedbase)---*/
 
-extern closedbase(dbase)
-  struct Database *dbase;
-
+extern void closedbase(struct Database *dbase)
   {
    fclose(dbase->fp);
    free(dbase->filename);
@@ -155,9 +153,7 @@ extern closedbase(dbase)
 
 /*--------------------------------------------------------------(firstseq)---*/
 
-extern struct Sequence *firstseq(dbase)
-  struct Database *dbase;
-
+extern struct Sequence *firstseq(struct Database *dbase)
   {
    if (dbase->filepos!=0L)
      {
@@ -173,18 +169,14 @@ extern struct Sequence *firstseq(dbase)
 
 /*---------------------------------------------------------------(nextseq)---*/
 
-extern struct Sequence *nextseq(dbase)
-  struct Database *dbase;
-
+extern struct Sequence *nextseq(struct Database *dbase)
   {
    return(readentry(dbase));
   }
 
 /*--------------------------------------------------------------(closeseq)---*/
 
-extern closeseq(seq)
-  struct Sequence *seq;
-
+extern void closeseq(struct Sequence *seq)
   {
    if (seq==NULL) return;
 
@@ -201,12 +193,8 @@ extern closeseq(seq)
 
 /*---------------------------------------------------------------(openwin)---*/
 
-extern struct Sequence *openwin(parent, start, length)
-  struct Sequence *parent;
-  int start, length;
-
+extern struct Sequence *openwin(struct Sequence *parent, int start, int length)
   {struct Sequence *win;
-   int i;
 
    if (start<0 || length<0 || start+length>parent->length)
      {
@@ -266,10 +254,7 @@ extern struct Sequence *openwin(parent, start, length)
 
 /*---------------------------------------------------------------(nextwin)---*/
 
-extern struct Sequence *nextwin(win, shift)
-  struct Sequence *win;
-  int shift;
-
+extern struct Sequence *nextwin(struct Sequence *win, int shift)
   {
    if ((win->start+shift)<0 ||
        (win->start+win->length+shift)>win->parent->length)
@@ -285,8 +270,7 @@ extern struct Sequence *nextwin(win, shift)
 /*--------------------------------------------------------------(shiftwin1)---*/
 static void	decrementsv(), incrementsv();
 
-extern int shiftwin1(win)
-	struct Sequence	*win;
+extern int shiftwin1(struct Sequence *win)
 {
 	register int	j, length;
 	register int	*comp;
@@ -316,9 +300,7 @@ extern int shiftwin1(win)
 
 /*--------------------------------------------------------------(closewin)---*/
 
-extern closewin(win)
-  struct Sequence *win;
-
+extern void closewin(struct Sequence *win)
   {
    if (win==NULL) return;
 
@@ -333,8 +315,7 @@ extern closewin(win)
 
 /*----------------------------------------------------------------(compon)---*/
 
-extern compon(win)
-	struct Sequence	*win;
+extern void compon(struct Sequence *win)
 {
 	register int	*comp;
 	register int	aa;
@@ -355,14 +336,12 @@ extern compon(win)
 
 /*---------------------------------------------------------------(stateon)---*/
 
-static int state_cmp(s1, s2)
-	int	*s1, *s2;
-{
-	return *s2 - *s1;
+static int state_cmp(const void *s1, const void *s2)
+{ 
+	return *((const int *)s2) - *((const int *)s1);
 }
 
-extern stateon(win)
-	struct Sequence	*win;
+extern void stateon(struct Sequence *win)
 {
 	register int	aa, nel, c;
 
@@ -386,9 +365,7 @@ extern stateon(win)
 
 /*-----------------------------------------------------------------(enton)---*/
 
-extern enton(win)
-  struct Sequence *win;
-
+extern void enton(struct Sequence *win)
   {
    if (win->state==NULL) {stateon(win);}
 
@@ -404,8 +381,7 @@ static double	*entray;
 #define LN2	0.69314718055994530941723212145818
 
 void
-entropy_init(window)
-	int	window;
+entropy_init(int window)
 {
 	int		i;
 	double	x, xw;
@@ -420,8 +396,7 @@ entropy_init(window)
 	thewindow = window;
 }
 
-extern double entropy(sv)
-	register int	*sv;
+extern double entropy(register int *sv)
 {
 	int	*sv0 = sv;
 	register double	ent;
@@ -453,9 +428,7 @@ extern double entropy(sv)
 /*-----------------------------------------------------------(decrementsv)---*/
 
 static void
-decrementsv(sv, class)
-	register int	*sv;
-	register int	class;
+decrementsv(register int *sv, register int class)
 {
 	register int	svi;
 
@@ -470,9 +443,7 @@ decrementsv(sv, class)
 /*-----------------------------------------------------------(incrementsv)---*/
 
 static void
-incrementsv(sv, class)
-	register int	*sv;
-	int	class;
+incrementsv(register int *sv, int class)
 {
 	for (;;) {
 		if (*sv++ == class) {
@@ -484,9 +455,7 @@ incrementsv(sv, class)
 
 /*-------------------------------------------------------------(readentry)---*/
 
-struct Sequence *readentry(dbase)
-  struct Database *dbase;
-
+struct Sequence *readentry(struct Database *dbase)
   {struct Sequence *seq;
    int	c;
 
@@ -542,9 +511,7 @@ struct Sequence *readentry(dbase)
 
 /*---------------------------------------------------------------(readhdr)---*/
 
-readhdr(seq)
-  struct Sequence *seq;
-
+int readhdr(struct Sequence *seq)
   {FILE *fp;
    char *bptr, *curpos;
    int	c, i, itotal;
@@ -681,9 +648,7 @@ readhdr(seq)
 
 /*--------------------------------------------------------------(skipline)---*/
 
-skipline(fp)
-  FILE *fp;
-
+void skipline(FILE *fp)
   {int	c;
 
    while ((c=getc(fp))!='\n' && c!=EOF)
@@ -694,10 +659,7 @@ skipline(fp)
 
 /*--------------------------------------------------------------(findchar)---*/
 
-extern int findchar(str, chr)
-  char *str;
-  char chr;
-
+extern int findchar(char *str, char chr)
   {int i;
 
    for (i=0; ; i++)
@@ -715,9 +677,7 @@ extern int findchar(str, chr)
 
 /*---------------------------------------------------------------(readseq)---*/
 
-readseq(seq)
-  struct Sequence *seq;
-
+void readseq(struct Sequence *seq)
 {FILE *fp;
    int i, itotal;
    int	c;
@@ -792,9 +752,7 @@ EndLoop:
 }
 /*-----------------------------------------------------------------(upper)---*/
 
-extern upper(string, len)
-	register char	*string;
-	size_t	len;
+extern void upper(register char *string, size_t len)
 {
 	register char	*stringmax, c;
 
@@ -805,9 +763,7 @@ extern upper(string, len)
 
 /*-----------------------------------------------------------------(lower)---*/
 
-extern lower(string, len)
-	char	*string;
-	size_t	len;
+extern void lower(char *string, size_t len)
 {
 	register char	*stringmax, c;
 
@@ -818,9 +774,7 @@ extern lower(string, len)
 
 /*-------------------------------------------------------------------(min)---*/
 
-int min(a, b)
-  int a, b;
-
+int min(int a, int b)
   {
    if (a<b) {return(a);}
    else {return(b);}
@@ -828,9 +782,7 @@ int min(a, b)
 
 /*-------------------------------------------------------------------(max)---*/
 
-int max(a, b)
-  int a, b;
-
+int max(int a, int b)
   {
    if (a<b) {return(b);}
    else {return(a);}
@@ -840,9 +792,7 @@ int max(a, b)
 
 /*---------------------------------------------------------------(tmalloc)---*/
 
-void *tmalloc(size)
-  size_t size;
-
+void *tmalloc(size_t size)
   {void *ptr;
 
    ptr = (void *) malloc(size);
@@ -852,7 +802,7 @@ void *tmalloc(size)
       exit(2);
      }
 
-   record_ptrs[rptr] = (int) ptr;
+   record_ptrs[rptr] = ptr;
    rptr++;
 
    return(ptr);
@@ -860,14 +810,12 @@ void *tmalloc(size)
 
 /*-----------------------------------------------------------------(tfree)---*/
 
-tfree(ptr)
-  void *ptr;
-
+void tfree(void *ptr)
   {int i;
 
    for (i=0; i<rptr; i++)
      {
-      if (record_ptrs[i]==(int)ptr)
+      if (record_ptrs[i]==ptr)
         {
          record_ptrs[i] = 0;
          break;

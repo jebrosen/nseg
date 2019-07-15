@@ -1,4 +1,5 @@
-CFLAGS += -g --std=c89 -D_BSD_SOURCE
+CFLAGS += -g --std=c89 -D_POSIX_C_SOURCE=2 -D_BSD_SOURCE
+CFLAGS += -Wall -Wextra -Wold-style-definition
 LDLIBS += -lm
 
 all : nseg nmerge

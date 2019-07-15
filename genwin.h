@@ -146,22 +146,30 @@ struct PerScoreVec
 
 /*----------------------------------------------------------------(protos)---*/
 
-extern struct Database *opendbase();
-extern closedbase();
+void genwininit(void);
+
+extern struct Database *opendbase(char *name);
+extern void closedbase(struct Database *dbase);
 
 extern struct Sequence *openseq(), *firstseq(), *nextseq();
-extern closeseq();
+extern void closeseq(struct Sequence *seq);
 
-extern struct Sequence *openwin(), *nextwin();
-extern shiftwin(), closewin();
+extern struct Sequence *openwin(struct Sequence *parent, int start, int length);
+extern struct Sequence *nextwin(struct Sequence *win, int shift);
+extern int shiftwin1(struct Sequence *win);
+extern void closewin(struct Sequence *win);
 
-extern compon(), stateon(), enton();
-extern double entropy();
+extern void compon(struct Sequence *win);
+extern void stateon(struct Sequence *win);
+extern void enton(struct Sequence *win);
+void entropy_init(int window);
+extern double entropy(register int *sv);
 
 extern struct Matrix *openmat();
-extern closemat();
 
-extern upper(), lower(), findchar();
+extern void upper(register char *string, size_t len);
+extern void lower(char *string, size_t len);
+extern int findchar(char *str, char chr);
 
 /*----------------------------------------------------------------(macros)---*/
 

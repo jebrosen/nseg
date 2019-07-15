@@ -12,10 +12,7 @@
 #include "genwin.h"
 void printseq();
 
-main(argc, argv)
-  int argc;
-  char *argv[];
-
+int main(int argc, char *argv[])
   {struct Database **dbs;
    struct Sequence *seq, *newseq;
    int i, ndbs;
@@ -86,11 +83,8 @@ merge differently masked nucleic acid sequence databases\n\n\
 
 /*----------------------------------------------------------------(printseq)---*/
 
-void printseq(seq, fpout)
-  struct Sequence *seq;
-  FILE *fpout;
-
-  {int i, len;
+void printseq(struct Sequence *seq, FILE *fpout)
+  {int i;
    int line, linelen;
 
    linelen = 60;
