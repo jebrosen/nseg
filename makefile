@@ -1,5 +1,16 @@
-CFLAGS += -g --std=c89 -D_POSIX_C_SOURCE=2 -D_BSD_SOURCE
+CFLAGS += -g --std=c89
+
+# for getopt
+CFLAGS += -D_POSIX_C_SOURCE=2
+
+# for memccpy
+CFLAGS += -D_BSD_SOURCE
+
+# for _BSD_SOURCE deprecation with glibc >= 2.20
+CFLAGS += -D_DEFAULT_SOURCE
+
 CFLAGS += -Wall -Wextra -Wold-style-definition
+
 LDLIBS += -lm
 
 all : nseg nmerge
